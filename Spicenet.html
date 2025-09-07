@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynomo Quiz</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(-45deg, black, red, black, red);
+      background-size: 400% 400%;
+      animation: gradient 8s ease infinite;
+      color: white;
+      overflow: hidden;
+      position: relative;
+    }
+
+    @keyframes gradient {
+      0% {background-position: 0% 50%;}
+      50% {background-position: 100% 50%;}
+      100% {background-position: 0% 50%;}
+    }
+
+    .container {
+      text-align: center;
+      width: 80%;
+      max-width: 600px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Main Logo */
+    .logo {
+      width: 150px;
+      margin-bottom: 10px;
+      opacity: 0;
+      transform: translateY(100px);
+      animation: riseUp 2s ease-out forwards;
+      z-index: 2;
+      position: relative;
+    }
+
+    @keyframes riseUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Floating small logos */
+    .floating-logos {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    @keyframes floatUpGlow {
+      0% {
+        transform: translateY(100px) scale(0.5);
+        opacity: 0;
+        filter: drop-shadow(0 0 0px yellow);
+      }
+      25% {
+        opacity: 1;
+        filter: drop-shadow(0 0 10px yellow);
+      }
+      50% {
+        filter: drop-shadow(0 0 20px yellow);
+      }
+      75% {
+        filter: drop-shadow(0 0 10px yellow);
+      }
+      100% {
+        transform: translateY(-200px) scale(0.5);
+        opacity: 0;
+        filter: drop-shadow(0 0 0px yellow);
+      }
+    }
+
+    .floating-logo {
+      width: 50px;
+      position: absolute;
+      bottom: 0;
+      animation: floatUpGlow 3s linear infinite;
+    }
+
+    .hidden { display: none; }
+
+    button {
+      background: red;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .timer-bar {
+      height: 10px;
+      background: lime;
+      margin: 10px 0;
+      border-radius: 5px;
+      transition: width 1s linear;
+    }
+
+    .question {
+      font-size: 22px;
+      margin: 15px 0;
+    }
+
+    .option {
+      display: block;
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .option:hover { background: rgba(255,255,255,0.3); }
+
+    .correct { background: green !important; }
+    .wrong { background: darkred !important; }
+  </style>
+</head>
+<body>
+  <!-- Floating Logos Layer -->
+  <div class="floating-logos"></div>
+
+  <div class="container">
+    <!-- Main Logo -->
+    <img src="logo.png" alt="Logo" class="logo">
+
+    <!-- Name Entry -->
+    <div id="nameScreen">
+      <h1>Spicenet Quiz Zone</h1>
+      <h2>Enter Your Name</h2>
+      <input type="text" id="username" placeholder="Your name" />
+      <br><br>
+      <button onclick="startQuiz()">Start Quiz</button>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div id="quizScreen" class="hidden">
+      <div id="timerBar" class="timer-bar"></div>
+      <div id="question" class="question"></div>
+      <div id="options"></div>
+    </div>
+
+    <!-- Result Screen -->
+    <div id="resultScreen" class="hidden">
+      <h2 id="finalScore"></h2>
+      <p id="message"></p>
+    </div>
+  </div>
+
+  <script>
+    const questions = [
+      {q: "What is the primary purpose of Spice Flow?", a: ["To create new blockchains","To provide a unified API/SDK for scalable cross-chain distribution","To replace all smart contracts with a single global contract","To develop only wallet software"], correct: 1},
+      {q: "Spice Flow is mainly focused on applications built for?", a: ["Web2 ecosystems only","Bitcoin and Ethereum only","Every major EVM-compatible blockchain ecosystem","Gaming platforms exclusively"], correct: 2},
+      {q: "Which of the following is NOT a key feature of Spice Flow?", a: ["Bridge-free, native user experience","Reduced distribution costs","Requires smart contract redeployment","Easy client-side integration"], correct: 2},
+      {q: "What does Spice Flow eliminate the need for when accessing multiple blockchain networks?", a: ["Wallets","Gas fees","Bridges and redeploying smart contracts","Token swaps"], correct: 2},
+      {q: "Where can you find a step-by-step guide to quickly integrate Spice Flow?", a: ["Best Practices section","Quick Start guide","EIP-7702 Deep Dive","Discord community"], correct: 1},
+      {q: "The Deep Dive section in Spice Flow’s documentation focuses on?", a: ["EIP-1559 fee structure","EIP-7702 delegation contract","GameFi mechanics","Blockchain marketing strategies"], correct: 1},
+      {q: "Which section provides guidelines to ensure security during integration?", a: ["Quick Start","API Reference","Best Practices","Deep Dive"], correct: 2},
+      {q: "Which Spice Flow feature helps developers integrate easily without modifying smart contracts?", a: ["Native bridge-free UX","Deep Dive documentation","Quick Start guide","Easy client-side integration"], correct: 3},
+      {q: "Which feature ensures that users can access applications using their existing wallets and assets?", a: ["Native, bridge-free UX","Quick Start guide","API Reference","Best Practices"], correct: 0},
+      {q: "Which feature of Spice Flow helps applications reach more users without extra development costs?", a: ["Deep Dive documentation","Reduced distribution costs","Discord community","Native smart contracts"], correct: 1}
+    ];
+
+    let shuffledQuestions, current = 0, score = 0, timer, timeLeft, userName = "";
+
+    function startQuiz() {
+      userName = document.getElementById("username").value.trim();
+      if (!userName) { alert("Please enter your name"); return; }
+
+      document.getElementById("nameScreen").classList.add("hidden");
+      document.getElementById("quizScreen").classList.remove("hidden");
+
+      shuffledQuestions = [...questions].sort(() => Math.random() - 0.5);
+      current = 0;
+      score = 0;
+      showQuestion();
+    }
+
+    function showQuestion() {
+      if (current >= shuffledQuestions.length) {
+        endQuiz();
+        return;
+      }
+
+      const q = shuffledQuestions[current];
+      document.getElementById("question").textContent = q.q;
+
+      const optionsDiv = document.getElementById("options");
+      optionsDiv.innerHTML = "";
+      q.a.forEach((opt, i) => {
+        const btn = document.createElement("div");
+        btn.textContent = opt;
+        btn.className = "option";
+        btn.onclick = () => selectAnswer(i, btn);
+        optionsDiv.appendChild(btn);
+      });
+
+      startTimer();
+    }
+
+    function startTimer() {
+      clearInterval(timer);
+      timeLeft = 20;
+      updateTimerBar();
+
+      timer = setInterval(() => {
+        timeLeft--;
+        updateTimerBar();
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          showCorrectThenNext();
+        }
+      }, 1000);
+    }
+
+    function updateTimerBar() {
+      const bar = document.getElementById("timerBar");
+      bar.style.width = (timeLeft/20*100) + "%";
+      if (timeLeft > 10) bar.style.background = "lime";
+      else if (timeLeft > 5) bar.style.background = "orange";
+      else bar.style.background = "red";
+    }
+
+    function selectAnswer(i, btn) {
+      clearInterval(timer);
+      const correctIndex = shuffledQuestions[current].correct;
+      const options = document.querySelectorAll(".option");
+
+      if (i === correctIndex) {
+        btn.classList.add("correct");
+        score++;
+      } else {
+        btn.classList.add("wrong");
+        options[correctIndex].classList.add("correct");
+      }
+
+      setTimeout(() => {
+        current++;
+        showQuestion();
+      }, 2000);
+    }
+
+    function showCorrectThenNext() {
+      const correctIndex = shuffledQuestions[current].correct;
+      const options = document.querySelectorAll(".option");
+      options[correctIndex].classList.add("correct");
+
+      setTimeout(() => {
+        current++;
+        showQuestion();
+      }, 2000);
+    }
+
+    function endQuiz() {
+      document.getElementById("quizScreen").classList.add("hidden");
+      document.getElementById("resultScreen").classList.remove("hidden");
+      document.getElementById("finalScore").textContent = 
+        "Well done " + userName + ", you scored " + score + " / " + questions.length;
+
+      let msg = "";
+      if (score <= 5) msg = "Good going!";
+      else if (score <= 8) msg = "Awesome!";
+      else msg = "Perfect Amazing!";
+      document.getElementById("message").textContent = msg;
+    }
+
+    // Floating small logos
+    const floatingContainer = document.querySelector('.floating-logos');
+    function createFloatingLogo() {
+      const logo = document.createElement('img');
+      logo.src = 'logo.png';
+      logo.className = 'floating-logo';
+      logo.style.left = Math.random() * (window.innerWidth - 50) + 'px';
+      floatingContainer.appendChild(logo);
+      setTimeout(() => floatingContainer.removeChild(logo), 3000);
+    }
+    setInterval(createFloatingLogo, 500);
+  </script>
+</body>
+</html>
